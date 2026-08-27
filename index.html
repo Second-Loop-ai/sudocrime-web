@@ -135,6 +135,13 @@ header {
   transition: transform .08s, box-shadow .08s, background .12s;
 }
 .btn .ico { font-size: 1.15em; line-height: 1; }
+/* La cruz del botón TACHAR es un SVG (ver game-structure.html). Se dimensiona
+   en em para que acompañe al tamaño de letra del botón igual que hacían los
+   íconos de al lado, que sí son caracteres. */
+.btn .ico-x {
+  width: 1.15em; height: 1.15em; display: block;
+  stroke: #c0392f; stroke-width: 3.2;
+}
 .btn:hover  { transform: translateY(-2px); box-shadow: 0 5px 0 var(--border2), 0 7px 14px rgba(120,84,50,0.22); }
 .btn:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--border2); }
 
@@ -332,7 +339,18 @@ main {
   font-size: clamp(13px, 1.6vmin, 15px);
   color: var(--dim); letter-spacing: 1px; text-transform: uppercase;
 }
-.level-stars { font-size: clamp(12px, 1.6vmin, 15px); color: var(--accent2); letter-spacing: 1px; }
+/* Las estrellas y la tilde son SVG, no caracteres: ver el comentario de
+   svgIcon() en game.js. Se dimensionan con em para que sigan al tipo de letra
+   que las rodea, igual que hacía el glifo al que reemplazan. */
+.level-stars { display: inline-flex; align-items: center; gap: 2px; }
+.level-stars .estrella {
+  width: clamp(11px, 1.5vmin, 14px); height: clamp(11px, 1.5vmin, 14px);
+  fill: var(--accent2); stroke: none;
+}
+.char-badge .tilde {
+  width: 15px; height: 15px;
+  stroke: #1f9d54; stroke-width: 3.4; fill: none;
+}
 .level-name {
   font-family: var(--font-display); font-weight: 700;
   font-size: clamp(14px, 1.9vmin, 18px);
@@ -586,19 +604,30 @@ main {
   font-size: calc(var(--sz) * 0.22); line-height: 1;
 }
 
-/* X mark — a bold red "ruled out" cross, unmistakable on any floor */
+/* X mark — la cruz roja de "acá no está", legible sobre cualquier piso.
+   ES UN SVG, NO UN CARÁCTER, y eso es a propósito.
+
+   Antes era el carácter '✕' (U+2715) con font-family de la fuente del juego.
+   Pero al recortar Baloo 2 al subconjunto latino la fuente quedó con 238
+   glifos y U+2715 no es uno de ellos, así que el navegador tenía que ir a
+   buscarlo a una fuente del sistema. Qué fuente elige depende del dispositivo:
+   en un iPhone 14 Pro Max caía en una fuente de texto y se veía bien, y en un
+   iPhone 16 caía en Apple Color Emoji, que ignora `color` y trae sus propias
+   métricas — la cruz salía como un emoji gigante y descuadrado.
+
+   Un SVG se dibuja igual en todos lados: no hay fallback, no hay fuente que
+   elegir y el color lo controlamos nosotros. Para cualquier símbolo que sea
+   parte de la mecánica del juego, esta es la forma correcta. */
 .x-mark {
-  font-size: calc(var(--sz) * 0.66);
-  font-family: var(--font-display);
-  font-weight: 900;
-  line-height: 1;
-  color: #e0342c;
+  width: calc(var(--sz) * 0.62);
+  height: calc(var(--sz) * 0.62);
   pointer-events: none; z-index: 3;  /* capa 3: cruces */
-  text-shadow:
-     2px 0 0 #fff5e6, -2px 0 0 #fff5e6, 0 2px 0 #fff5e6, 0 -2px 0 #fff5e6,
-     2px 2px 0 #fff5e6, -2px 2px 0 #fff5e6, 2px -2px 0 #fff5e6, -2px -2px 0 #fff5e6,
-     0 3px 5px rgba(120,30,24,0.45);
+  filter: drop-shadow(0 3px 4px rgba(120,30,24,0.45));
 }
+/* El trazo claro va debajo y más grueso: hace de contorno para que la cruz
+   se lea sobre pisos oscuros igual que sobre pisos claros. */
+.x-mark .halo   { stroke: #fff5e6; stroke-width: 10; }
+.x-mark .stroke { stroke: #e0342c; stroke-width: 5.5; }
 
 /* Room name — a floor-plan style title centred over the room. It spans
    wider than a cell so it reads as a room label, never as tile contents.
@@ -862,7 +891,12 @@ main {
   <div class="header-controls" id="game-controls">
     <button class="btn" onclick="goToMenu()"><span class="ico">🏠</span><span class="lbl" id="t-menuBtn">MENÚ</span></button>
     <button class="btn" id="btn-draft" onclick="toggleDraft()"><span class="ico">✏</span><span class="lbl" id="t-draft">BORRADOR</span></button>
-    <button class="btn" id="btn-mark" onclick="toggleMark()"><span class="ico">✕</span><span class="lbl" id="t-mark">TACHAR</span></button>
+    <!-- La cruz va en SVG, no como carácter, por dos motivos. El técnico: el
+         carácter '✕' no está en las fuentes embebidas y cada iOS lo resuelve
+         con una fuente distinta (en un iPhone 16 caía en Apple Color Emoji).
+         El de diseño: tiene que ser LA MISMA cruz que aparece en el tablero al
+         tachar, y la del tablero ya es este mismo SVG. -->
+    <button class="btn" id="btn-mark" onclick="toggleMark()"><span class="ico"><svg class="ico-x" viewBox="0 0 26 26" fill="none" stroke-linecap="round" aria-hidden="true"><path d="M6 6 20 20 M20 6 6 20"/></svg></span><span class="lbl" id="t-mark">TACHAR</span></button>
     <button class="btn" id="btn-undo" onclick="undoMove()"><span class="ico">↩</span><span class="lbl" id="t-undo">DESHACER</span></button>
     <button class="btn danger" onclick="clearBoard()"><span class="ico">🗑</span><span class="lbl" id="t-clear">LIMPIAR</span></button>
     <button class="btn success" onclick="checkSolution()"><span class="ico">🔍</span><span class="lbl" id="t-check">VERIFICAR</span></button>
@@ -5755,6 +5789,37 @@ const IMG = {
 // ══════════════════════════════════════════════════
 let GRID, ROOMS, OBJECTS, CHARS, SOLUTION, KILLER, KILLER_ROOM;
 
+// ── Íconos ──────────────────────────────────────────────────────────────────
+// Todo símbolo que forme parte de la mecánica del juego se dibuja como SVG, no
+// como carácter de texto.
+//
+// El motivo: las fuentes del juego van embebidas y recortadas al subconjunto
+// latino (Baloo 2 quedó en 238 glifos). Un carácter como '✕' o '★' no está en
+// ese subconjunto, así que el navegador lo va a buscar a una fuente del
+// sistema — y cuál elige depende del dispositivo. En un iPhone 14 Pro Max la
+// cruz del tablero se veía bien y en un iPhone 16 caía en Apple Color Emoji:
+// salía como emoji a color, ignorando el `color` del CSS y con métricas
+// propias que rompían la celda.
+//
+// Un SVG no tiene fallback posible: se ve idéntico en todos lados. El costo es
+// unas líneas más de código; a cambio, un símbolo que el jugador NECESITA
+// entender para jugar no queda a merced de la tabla de fuentes del sistema.
+//
+// `viewBox` de 26x26 en todos los íconos, así los trazos se ven consistentes
+// entre uno y otro.
+function svgIcon(cls, contenido, viewBox) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', viewBox || '0 0 26 26');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');   // decorativo: no lo lee el lector de pantalla
+  svg.setAttribute('class', cls);
+  svg.innerHTML = contenido;
+  return svg;
+}
+
 function loadLevel(idx) {
   const lvl = LEVELS[idx];
   GRID = lvl.grid;
@@ -5969,7 +6034,7 @@ function buildMenu() {
 
   LEVELS.forEach((lvl, i) => {
     const status = levelStatus(i);
-    const stars = '★'.repeat(Math.min(Math.max(lvl.difficulty, 1), 5));
+    const stars = Math.min(Math.max(lvl.difficulty, 1), 5);
 
     // A header opens each band. It spans the whole grid row so the cards below
     // it keep their normal auto-fit columns.
@@ -6006,7 +6071,11 @@ function buildMenu() {
     num.textContent = t.levelWord(i + 1);
     const starsEl = document.createElement('span');
     starsEl.className = 'level-stars';
-    starsEl.textContent = stars;
+    // Una estrella SVG por punto de dificultad. Con el carácter '★' bastaba un
+    // .repeat(), pero ese codepoint no está en las fuentes embebidas.
+    for (let s = 0; s < stars; s++)
+      starsEl.appendChild(svgIcon('estrella',
+        '<path d="M13 2.5 16.3 9.4 23.8 10.4 18.4 15.7 19.7 23.2 13 19.6 6.3 23.2 7.6 15.7 2.2 10.4 9.7 9.4Z"/>'));
     top.appendChild(num);
     top.appendChild(starsEl);
 
@@ -6517,10 +6586,9 @@ function renderBoard() {
       }
 
       if (!hasContent && S.marks.has(key)) {
-        const el = document.createElement('div');
-        el.className = 'x-mark';
-        el.textContent = '✕';
-        cell.appendChild(el);
+        cell.appendChild(svgIcon('x-mark',
+          '<path class="halo"   d="M6 6 20 20 M20 6 6 20"/>' +
+          '<path class="stroke" d="M6 6 20 20 M20 6 6 20"/>'));
       }
     }
   }
@@ -6663,8 +6731,16 @@ function updateCharCards() {
     if (placed) {
       if (!badge) { badge = document.createElement('div'); badge.className = 'char-badge'; card.appendChild(badge); }
       const drafted = S.drafts[ch.id];
-      badge.textContent = drafted ? `?${drafted.length}` : '✓';
-      badge.style.color = drafted ? '#aaa' : '#44ff88';
+      badge.textContent = '';
+      if (drafted) {
+        badge.textContent = `?${drafted.length}`;
+        badge.style.color = '#aaa';
+      } else {
+        // Tilde en SVG y no el carácter '✓': ese codepoint no está en las
+        // fuentes embebidas y terminaría resuelto por la fuente del sistema.
+        badge.appendChild(svgIcon('tilde', '<path d="M6 13.5 11 18.5 20 8"/>'));
+        badge.style.color = '';
+      }
     } else if (badge) badge.remove();
   }
 }
