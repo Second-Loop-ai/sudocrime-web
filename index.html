@@ -431,6 +431,23 @@ main {
   background: var(--surface); color: var(--ink);
   box-shadow: 0 2px 0 var(--border2), 0 3px 6px rgba(120,84,50,0.2);
 }
+/* Sello de versión: tiene que ser legible si alguien lo busca, e invisible si
+   no. Chico, tenue y seleccionable, para que se pueda copiar y pegar. */
+/* Diagnóstico del calce del tablero, sólo visible en modo dev. Sirve para que
+   un problema de tamaño en un dispositivo que no tenemos se pueda reportar con
+   números en vez de con una descripción. */
+.dev-fit {
+  margin-top: 4px; font-size: 10px; font-weight: 700;
+  opacity: .85; letter-spacing: .2px;
+  user-select: text; -webkit-user-select: text;
+}
+
+.build-stamp {
+  margin-top: 2px; font-size: 10px; letter-spacing: .4px;
+  color: rgba(138,111,82,0.55); font-weight: 700;
+  user-select: text; -webkit-user-select: text;
+}
+
 .divider { border: none; border-top: 2px dashed var(--border); margin: 4px 0; }
 #rules-box {
   font-size: clamp(9px, 1.2vmin, 12px); color: var(--dim); line-height: 1.9;
@@ -488,6 +505,18 @@ main {
 #board-wrap {
   position: relative;
   border-radius: var(--radius);
+  /* overflow:hidden es necesario: recorta el tablero a las esquinas
+     redondeadas de la madera. Pero combinado con flex-shrink convierte
+     cualquier error de medición en un recorte INVISIBLE — el tablero se corta
+     y nada avisa. Así se perdían la última fila y los nombres de las
+     habitaciones de abajo en pantallas cortas.
+
+     flex-shrink:0 saca ese camino: #board-wrap toma el tamaño de su contenido
+     y no se deja apretar por sus hermanos. Si algún día el cálculo de --sz
+     vuelve a quedar mal, el tablero se desborda de forma visible en lugar de
+     desaparecer prolijamente por abajo. Un fallo que se ve se arregla; uno
+     que no se ve se publica. */
+  flex-shrink: 0;
   overflow: hidden;
   box-shadow: 0 0 0 5px #7c4e2d, 0 10px 0 #5f3a20, 0 16px 34px rgba(90,60,36,0.4);
 }
@@ -877,6 +906,56 @@ main {
     padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
     font-size: 10px;
   }
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     AIRE PARA EL TABLERO
+     ═════════════════════════════════════════════════════════════════════════
+
+     El tablero es lo único de esta pantalla que el jugador mira todo el
+     tiempo, y en un teléfono era lo que menos espacio tenía. Estas dos reglas
+     le devuelven ~84 pt de alto, que en un iPhone 16 lo llevan de celdas de
+     34 px a celdas limitadas por el ANCHO (~44 px) — o sea, al máximo que la
+     pantalla permite. Pasado ese punto, ganar más alto no agranda nada: por
+     eso no se toca la barra de estado ni el dock de sospechosos, que son los
+     que más alto ocupan.
+
+     1) LA FILA DE BOTONES NUNCA SE PARTE EN DOS.
+        Con flex-wrap:wrap, en un teléfono de 393 px los seis botones más el
+        de idioma no entraban y VERIFICAR caía a una segunda fila. Eso costaba
+        ~54 pt de alto — el elemento más caro de la pantalla, y sin que nada
+        lo delatara. */
+  .header-controls {
+    flex-wrap: nowrap;
+    /* Red de seguridad para pantallas más angostas que las que probamos: si
+       aun así no entra, la fila se desplaza en horizontal. Incómodo, pero
+       nunca vuelve a robarle una fila entera de alto al tablero. */
+    overflow-x: auto;
+    scrollbar-width: none;
+    min-width: 0;
+  }
+  .header-controls::-webkit-scrollbar { display: none; }
+  /* Un poco menos de letra y de aire en las etiquetas: es lo que hace que
+     "BORRADOR", "DESHACER" y "VERIFICAR" entren en una sola fila sin bajar
+     del mínimo de 40x46 px de área tocable. */
+  .btn .lbl { font-size: clamp(6.5px, 2.1vw, 10px); }
+  .btn { padding: 6px clamp(2px, 0.9vw, 9px); }
+  .lang-btn { padding: 10px clamp(6px, 1.8vw, 11px); flex-shrink: 0; }
+
+  /* 2) EL PANEL DE PISTAS VACÍO NO RESERVA UNA CAJA ENTERA.
+        Mientras no hay ningún sospechoso elegido sólo muestra una invitación
+        a elegir uno, y para eso reservaba 46 pt con borde, fondo y padding.
+        Colapsado a una línea de texto sigue diciendo lo mismo y devuelve
+        ~30 pt. Al elegir un sospechoso vuelve a ser la caja completa, que es
+        cuando de verdad tiene contenido que leer. */
+  #active-clue-panel.empty {
+    min-height: 0;
+    padding: 0 8px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    font-size: 10.5px;
+    line-height: 1.3;
+  }
 }
 
 @media (min-width: 861px) {
@@ -902,7 +981,12 @@ main {
     <button class="btn success" onclick="checkSolution()"><span class="ico">🔍</span><span class="lbl" id="t-check">VERIFICAR</span></button>
   </div>
   <div class="header-right">
-    <button class="lang-btn" onclick="toggleLang()">ES / EN</button>
+    <!-- Muestra el idioma AL QUE CAMBIA, no los dos. "ES / EN" ocupaba ~55 px
+         de ancho y era justo lo que hacía que la fila de botones no entrara y
+         se partiera en dos en un teléfono, robándole ~54 pt de alto al
+         tablero. Con una sola etiqueta ocupa ~32 px y además se entiende
+         mejor: dice qué va a pasar si lo tocás. -->
+    <button class="lang-btn" id="t-langBtn" onclick="toggleLang()">EN</button>
   </div>
 </header>
 
@@ -914,6 +998,15 @@ main {
          else is bound to it, so the gesture can't collide with a real action. -->
     <div class="menu-title" id="t-menuTitle">☠ SUDOCRIME ☠</div>
     <div class="menu-subtitle" id="t-menuSubtitle">Elegí un caso para investigar</div>
+    <!-- Sello de versión. Lo rellena build.js con la fecha y un hash del
+         contenido, y build.js FALLA si este elemento no está.
+
+         Sirve para una pregunta que de otro modo no tiene respuesta: cuando
+         alguien dice "sigue igual" después de un arreglo, ¿el arreglo no
+         sirvió, el archivo nuevo nunca se subió, o el teléfono está mostrando
+         una copia en caché? Se le pide este código y quedan descartadas dos
+         de las tres. -->
+    <div class="build-stamp" id="build-stamp">2026-08-28·fac706c</div>
     <!-- Only rendered while dev mode is on, so a player never sees it. -->
     <div id="dev-badge" class="dev-badge" style="display:none"></div>
     <div id="level-list"></div>
@@ -6671,8 +6764,70 @@ function renderActiveCluePanel() {
 // the board, the active-clue panel's own column/row taking its share from
 // <main>, etc). Recompute --sz from the real available box so the whole
 // NxN grid — including the outer wall — always fits with nothing clipped.
+// El lado de celda más grande con el que un tablero de N x N entra completo en
+// una caja de availW x availH. Es una función pura para poder testear el
+// invariante que importa: el tablero NUNCA puede salirse de su caja.
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// EL BUG QUE ESTA FUNCIÓN EXISTE PARA NO REPETIR
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Antes esto era una línea con un piso de 40 px:
+//
+//     Math.max(40, Math.min(116, Math.floor(Math.min(availW, availH) / span)))
+//
+// El piso estaba puesto para que las celdas no quedaran imposibles de tocar.
+// Pero un piso pisa el cálculo: si en el alto disponible sólo entran celdas de
+// 34 px, esto devolvía 40 igual, el tablero quedaba más alto que su caja y
+// #board-wrap — que tiene overflow:hidden para redondear las esquinas — lo
+// recortaba en silencio.
+//
+// En un iPhone 16 se veía así: a #center le quedan unos 288 px de alto, un
+// tablero de 7x7 ocupa sz * 8.28, entran celdas de 34.8 px, el piso forzaba 40
+// y el tablero medía 331 px. Se perdían 43 px: la última fila de celdas y los
+// nombres de las habitaciones de abajo (COCINA, OFICINA) salían cortados al
+// medio. En un iPhone 14 Pro Max el cálculo daba 42 px, por encima del piso, y
+// por eso ahí se veía perfecto. El mismo código, dos resultados.
+//
+// La decisión de fondo: ANTE LA DUDA, ACHICAR, NUNCA RECORTAR. Una celda de 34
+// px es incómoda; una celda que no se ve es un puzzle que no se puede jugar.
+//
+// NO HAY PISO. Un primer intento de arreglo dejó uno de 20 px "como red de
+// seguridad", y el test lo agarró en el acto: un tablero de 9x9 en una caja de
+// 240x200 volvía a salirse 12 px. Era el mismo error que el piso de 40, apenas
+// más chico. Cualquier piso, por bajo que sea, rompe el invariante en algún
+// tamaño de caja — y el invariante es justamente lo único que hay que
+// garantizar. Si la caja es absurda, el tablero sale diminuto: feo, pero
+// entero y sin sorpresas.
+//
+// CELL_COMFORT no se usa para forzar nada. Está para documentar a partir de
+// dónde la celda se vuelve incómoda de tocar, y como umbral del aviso en modo
+// dev. Si el juego cae por debajo de eso en un teléfono real, el arreglo es
+// darle más alto al tablero en el layout, no mentirle al cálculo.
+const CELL_MAX = 116;
+const CELL_COMFORT = 34;
+
+function cellSizeThatFits(availW, availH, n) {
+  if (!(availW > 0) || !(availH > 0) || !(n > 0)) return null;
+  const span = n + WALL_RATIO * (n + 1);         // en anchos de celda
+  const cabe = Math.floor(Math.min(availW, availH) / span);
+  if (!isFinite(cabe)) return null;
+  return Math.max(1, Math.min(CELL_MAX, cabe));
+}
+
+// Cuántas veces como máximo se corrige el tamaño contra el layout real. Cada
+// vuelta fuerza un reflow, así que hay tope; con 24 alcanza de sobra porque se
+// parte de un valor ya calculado y sólo se ajustan los últimos píxeles.
+const FIT_MAX_PASADAS = 24;
+
+// El último diagnóstico de fitBoard, para poder verlo en modo dev. Si el
+// tablero se ve mal en un dispositivo que no tenemos, estos números dicen
+// exactamente qué midió el navegador — sin eso sólo se puede adivinar.
+let ultimoFit = null;
+
 function fitBoard() {
   const center = document.getElementById('center');
+  const board = document.getElementById('board');
   const hint = document.getElementById('t-hint');
   if (!center) return;
 
@@ -6684,18 +6839,86 @@ function fitBoard() {
   const availW = center.clientWidth - padX;
   const availH = center.clientHeight - padY - (hint ? hint.offsetHeight + gap : 0);
 
-  const span = S.size + WALL_RATIO * (S.size + 1);   // in cell-widths
-  const sz = Math.max(40, Math.min(116, Math.floor(Math.min(availW, availH) / span)));
-  if (sz > 0 && isFinite(sz)) {
-    document.documentElement.style.setProperty('--sz', sz + 'px');
+  let sz = cellSizeThatFits(availW, availH, S.size);
+  if (sz === null) return;
+  const calculado = sz;
+  document.documentElement.style.setProperty('--sz', sz + 'px');
+
+  // ── Verificación contra la realidad ───────────────────────────────────────
+  // Lo de arriba es un MODELO del layout: asume que el tablero mide
+  // exactamente sz * (N + 0.16*(N+1)) y que a #center le queda lo que dicen
+  // sus paddings y la línea de ayuda. El bug del recorte existió porque ese
+  // modelo se dio por bueno sin comprobarlo nunca contra lo que el navegador
+  // realmente dibujó.
+  //
+  // Acá se le pregunta al navegador. Si el tablero salió más grande que su
+  // caja, se baja un píxel y se vuelve a medir, hasta que entre. Es más lento
+  // que confiar en la fórmula, pero es correcto en dispositivos que no podemos
+  // probar: cualquier cosa que el modelo no previera — métricas de una
+  // tipografía, un borde, el zoom del navegador, una barra de sistema, un
+  // motor que redondea distinto — queda corregida igual, porque la fuente de
+  // verdad pasa a ser el layout y no mi suposición.
+  //
+  // Sólo baja, nunca sube: si el modelo se quedó corto se desperdicia algo de
+  // espacio, que es un defecto cosmético. Recortar no lo es.
+  let pasadas = 0;
+  if (board && board.offsetHeight > 0) {
+    while (sz > 1 && pasadas < FIT_MAX_PASADAS &&
+           (board.offsetHeight > availH || board.offsetWidth > availW)) {
+      sz -= 1;
+      document.documentElement.style.setProperty('--sz', sz + 'px');
+      pasadas++;
+    }
   }
+
+  ultimoFit = {
+    availW: Math.round(availW), availH: Math.round(availH),
+    n: S.size, calculado, final: sz, pasadas,
+    alto: board ? board.offsetHeight : null,
+    ancho: board ? board.offsetWidth : null,
+    comodo: sz >= CELL_COMFORT,
+  };
+  actualizarDevFit();
+}
+
+// Muestra el diagnóstico del calce sólo en modo dev. Un jugador no lo ve nunca.
+function actualizarDevFit() {
+  const badge = document.getElementById('dev-badge');
+  if (!badge || !isDevMode() || !ultimoFit) return;
+  const f = ultimoFit;
+  const linea = `caja ${f.availW}x${f.availH} · ${f.n}x${f.n} · celda ${f.final}px` +
+    (f.pasadas ? ` (bajó ${f.pasadas} desde ${f.calculado})` : '') +
+    (f.comodo ? '' : ' · APRETADO');
+  let fit = badge.querySelector('.dev-fit');
+  if (!fit) {
+    fit = document.createElement('div');
+    fit.className = 'dev-fit';
+    badge.appendChild(fit);
+  }
+  fit.textContent = linea;
 }
 
 let fitBoardRAF = null;
-window.addEventListener('resize', () => {
+function refitPronto() {
   if (fitBoardRAF) cancelAnimationFrame(fitBoardRAF);
   fitBoardRAF = requestAnimationFrame(fitBoard);
-});
+}
+window.addEventListener('resize', refitPronto);
+
+// En iOS el alto visible cambia sin que llegue un 'resize': la barra de
+// direcciones de Safari se esconde al hacer scroll y vuelve al tocar arriba, y
+// eso mueve el piso de la página. `window.resize` no es confiable para eso;
+// visualViewport sí. Sin esto el tablero se calcula una vez contra un alto que
+// después deja de ser el real, que es justo cómo se recortaba.
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', refitPronto);
+}
+// La orientación y la carga de las tipografías cambian las alturas después del
+// primer layout. Medir una sola vez, temprano, da un número que envejece mal.
+window.addEventListener('orientationchange', refitPronto);
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(refitPronto).catch(() => {});
+}
 
 // Only FINAL placements can conflict — drafts are hypotheses and are
 // expected to overlap rows/columns/cells freely while candidates are
@@ -6983,6 +7206,10 @@ function applyLang() {
   const t = TR[S.lang];
 
   setTxt('t-title',         t.title);
+  // El botón de idioma muestra el idioma DESTINO, no el actual: es lo que
+  // pasa al tocarlo. Y ocupa la mitad que "ES / EN", que era lo que partía la
+  // fila de botones en dos en pantallas angostas.
+  setTxt('t-langBtn',       S.lang === 'es' ? 'EN' : 'ES');
   setTxt('t-menuBtn',       t.menuBtn);
   setTxt('t-menuTitle',     t.title);
   setTxt('t-menuSubtitle',  t.menuSubtitle);
